@@ -14,5 +14,5 @@ interface ProviderRepositoryInterface
 
     public function delete($id);
 
-    public function paginate($perPage);
+    public function paginate($perPage, $search, $sortField, $sortDirection);
 }

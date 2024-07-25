@@ -49,9 +49,16 @@ class ProviderRepository implements ProviderRepositoryInterface
         return false;
     }
 
-    public function paginate($perPage)
+    public function paginate($perPage, $search = '', $sortField = 'id', $sortDirection = 'DESC')
     {
-        $pagination = $this->model->with('address')->paginate($perPage);
+        $query = $this->model->with('address');
+
+        $query->where('company_name', 'like', '%' . $search . '%')
+        ->orWhere('document_number', 'like', '%' . $search . '%');
+
+        $query->orderBy($sortField, $sortDirection);
+
+        $pagination = $query->paginate($perPage);
 
         return [
             'data' => $pagination->items(),

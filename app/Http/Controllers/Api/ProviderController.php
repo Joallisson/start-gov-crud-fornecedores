@@ -7,6 +7,7 @@ use App\Repositories\Contracts\ProviderRepositoryInterface;
 use App\Http\Requests\StoreProviderRequest;
 use App\Http\Requests\UpdateProviderRequest;
 use App\Repositories\Contracts\AddressRepositoryInterface;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,12 @@ class ProviderController extends Controller
     public function index(Request $request)
     {
         $perPage = $request->input('per_page', 15);
-        $providers = $this->providerRepository->paginate($perPage);
+        $search = $request->input('search');
+        $sortField = $request->input('sort_field', 'id');
+        $sortDirection = $request->input('sort_direction', 'DESC');
+
+        $providers = $this->providerRepository->paginate($perPage, $search, $sortField, $sortDirection);
+
         return response()->json($providers);
     }
 
@@ -46,6 +52,18 @@ class ProviderController extends Controller
     public function store(StoreProviderRequest $request)
     {
         $validatedData = $request->validated();
+
+        if ($validatedData['document_type'] === 'CNPJ') {
+            try {
+                $client = new Client();
+                $cnpj = $validatedData['document_number'];
+                $response = $client->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
+                $responseData = json_decode($response->getBody(), true);
+
+            } catch (\Throwable $th) {
+                return response()->json(['error' => 'Fornecedor não existe.'], 400);
+            }
+        }
 
         DB::beginTransaction();
 
@@ -71,6 +89,18 @@ class ProviderController extends Controller
     public function update(UpdateProviderRequest $request, $id)
     {
         $validatedData = $request->validated();
+
+        if ($validatedData['document_type'] === 'CNPJ') {
+            try {
+                $client = new Client();
+                $cnpj = $validatedData['document_number'];
+                $response = $client->get("https://brasilapi.com.br/api/cnpj/v1/{$cnpj}");
+                $responseData = json_decode($response->getBody(), true);
+
+            } catch (\Throwable $th) {
+                return response()->json(['error' => 'Fornecedor não existe.'], 400);
+            }
+        }
 
         DB::beginTransaction();
 
