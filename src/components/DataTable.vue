@@ -88,6 +88,7 @@
     />
 
     <AddProviderModal
+      ref="addProviderModal"
       :visible="isAddModalVisible"
       @close="closeAddModal"
       @save="addProvider"
@@ -101,7 +102,7 @@
       @close="closeEditModal"
       @save="editProvider"
       :errors="errors"
-      :generalError="generalError"
+      :general-error="generalError"
     />
 
     <DeleteProviderModal
@@ -137,7 +138,7 @@ export default {
       isEditModalVisible: false,
       isDeleteModalVisible: false,
       currentPage: 1,
-      perPage: 5,
+      perPage: 2,
       perPageOptions: [2, 5, 10, 20, 50, 100],
       totalItems: 0,
       totalPages: 1,
@@ -145,6 +146,8 @@ export default {
       error: null,
       errors: {},
       generalError: '',
+      searchQuery: '',
+      sortOrder: 'ASC',
       provider: this.getInitialProviderData()
     }
   },
@@ -152,15 +155,13 @@ export default {
     this.fetchData();
   },
   methods: {
-    async fetchData(page = 1) {  
+    async fetchData(page = 1) {
       this.loading = true;
       this.error = null;
       const apiUrl = import.meta.env.VITE_API_BASE_URL;
-      console.log(`Fetching data for page: ${page}, perPage: ${this.perPage}, search: ${this.searchQuery}, sort: ${this.sortOrder}`);
       try {
-        const response = await fetch(`${apiUrl}/api/provider?per_page=${this.perPage}&page=${page}&search=${this.searchQuery ?? ''}&sort_direction=${this.sortOrder ?? 'desc'}`);
+        const response = await fetch(`${apiUrl}/api/provider?per_page=${this.perPage}&page=${page}&search=${this.searchQuery}&sort_direction=${this.sortOrder}`);
         const data = await response.json();
-        console.log('Data fetched:', data);
 
         this.rows = data.data;
         this.totalItems = data.meta.total_items;
@@ -174,23 +175,23 @@ export default {
       }
     },
     updatePerPage() {
-      this.fetchData(1); // Recarrega a tabela começando da primeira página com o novo valor de perPage
+      this.fetchData(1);
     },
     searchProviders() {
-      this.fetchData(1); // Realiza a busca começando da primeira página
+      this.fetchData(1);
     },
     showAddressModal(address) {
       this.selectedAddress = address;
       this.isAddressModalVisible = true;
     },
     showAddModal() {
+      this.$refs.addProviderModal.resetProviderForm();
       this.isAddModalVisible = true;
-      this.errors = {}; // Reset errors when opening the add modal
-      this.generalError = ''; // Reset general error when opening the add modal
+      this.errors = {};
+      this.generalError = '';
     },
     closeAddModal() {
       this.isAddModalVisible = false;
-      this.resetProviderForm();
     },
     async addProvider(provider) {
       const apiUrl = import.meta.env.VITE_API_BASE_URL;
@@ -203,7 +204,7 @@ export default {
           body: JSON.stringify(provider)
         });
         if (response.ok) {
-          this.fetchData(this.currentPage); // Recarrega os dados após adicionar o fornecedor
+          this.fetchData(this.currentPage);
           this.closeAddModal();
         } else {
           const errorData = await response.json();
@@ -219,41 +220,42 @@ export default {
       }
     },
     showEditModal(provider) {
-      this.selectedProvider = { ...provider }; // Clona o fornecedor para edição
+      this.selectedProvider = { ...provider };
       this.isEditModalVisible = true;
-      this.errors = {}; // Reset errors when opening the edit modal
+      this.errors = {};
+      this.generalError = '';
     },
     closeEditModal() {
       this.isEditModalVisible = false;
     },
     async editProvider(provider) {
-    const apiUrl = import.meta.env.VITE_API_BASE_URL;
-    try {
-      const response = await fetch(`${apiUrl}/api/provider/${provider.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(provider)
-      });
-      if (response.ok) {
-        this.fetchData(this.currentPage);
-        this.closeEditModal();
-      } else {
-        const errorData = await response.json();
-        if (response.status === 422 && errorData.errors) {
-          this.errors = errorData.errors;
-        } else if (response.status === 400 && errorData.error) {
-          this.generalError = errorData.error;
+      const apiUrl = import.meta.env.VITE_API_BASE_URL;
+      try {
+        const response = await fetch(`${apiUrl}/api/provider/${provider.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(provider)
+        });
+        if (response.ok) {
+          this.fetchData(this.currentPage);
+          this.closeEditModal();
+        } else {
+          const errorData = await response.json();
+          if (response.status === 422 && errorData.errors) {
+            this.errors = errorData.errors;
+          } else if (response.status === 400 && errorData.error) {
+            this.generalError = errorData.error;
+          }
+          console.error('Erro ao editar fornecedor:', errorData);
         }
-        console.error('Erro ao editar fornecedor:', errorData);
+      } catch (error) {
+        console.error('Erro ao editar fornecedor:', error);
       }
-    } catch (error) {
-      console.error('Erro ao editar fornecedor:', error);
-    }
-  },
+    },
     showDeleteModal(provider) {
-      this.selectedProvider = { ...provider }; // Clona o fornecedor para exclusão
+      this.selectedProvider = { ...provider };
       this.isDeleteModalVisible = true;
     },
     closeDeleteModal() {
@@ -269,7 +271,7 @@ export default {
           }
         });
         if (response.ok) {
-          this.fetchData(this.currentPage); // Recarrega os dados após excluir o fornecedor
+          this.fetchData(this.currentPage);
           this.closeDeleteModal();
         } else {
           console.error('Erro ao excluir fornecedor:', await response.text());
@@ -318,14 +320,15 @@ export default {
 }
 
 .table {
-  margin-bottom: 0; /* Remove espaço inferior da tabela */
+  margin-bottom: 0;
 }
 
 .pagination,
 .form-select {
-  margin-top: 10px; /* Adiciona espaço superior para os controles de paginação e seleção */
+  margin-top: 10px;
 }
+
 .form-select-width-sm {
-  width: 150px; /* Define uma largura específica para o select */
+  width: 150px;
 }
 </style>

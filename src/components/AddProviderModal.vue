@@ -83,7 +83,6 @@ export default {
   methods: {
     closeModal() {
       this.$emit('close');
-      this.resetProviderForm();
     },
     saveProvider() {
       if (this.validateForm()) {
