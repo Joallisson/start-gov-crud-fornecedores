@@ -3,6 +3,21 @@
     <div v-if="loading" class="loading-indicator">Carregando...</div>
     <div v-if="error" class="error-message">{{ error }}</div>
 
+    <div class="d-flex mb-3">
+      <input
+        type="text"
+        class="form-control me-2"
+        placeholder="Pesquisar por nome ou CPF/CNPJ"
+        v-model="searchQuery"
+        @keyup.enter="searchProviders"
+      />
+      <button class="btn btn-primary me-2" @click="searchProviders">Buscar</button>
+      <select class="form-select form-select-width-sm me-2" v-model="sortOrder" @change="searchProviders">
+        <option value="ASC">Crescente</option>
+        <option value="DESC">Decrescente</option>
+      </select>
+    </div>
+
     <button class="btn btn-success mb-3" @click="showAddModal">
       <i class="fas fa-plus"></i> Adicionar Fornecedor
     </button>
@@ -77,6 +92,7 @@
       @close="closeAddModal"
       @save="addProvider"
       :errors="errors"
+      :general-error="generalError"
     />
 
     <EditProviderModal
@@ -85,6 +101,7 @@
       @close="closeEditModal"
       @save="editProvider"
       :errors="errors"
+      :generalError="generalError"
     />
 
     <DeleteProviderModal
@@ -120,13 +137,14 @@ export default {
       isEditModalVisible: false,
       isDeleteModalVisible: false,
       currentPage: 1,
-      perPage: 2,
+      perPage: 5,
       perPageOptions: [2, 5, 10, 20, 50, 100],
       totalItems: 0,
       totalPages: 1,
       loading: false,
       error: null,
       errors: {},
+      generalError: '',
       provider: this.getInitialProviderData()
     }
   },
@@ -134,13 +152,13 @@ export default {
     this.fetchData();
   },
   methods: {
-    async fetchData(page = 1) {
+    async fetchData(page = 1) {  
       this.loading = true;
       this.error = null;
       const apiUrl = import.meta.env.VITE_API_BASE_URL;
-      console.log(`Fetching data for page: ${page}, perPage: ${this.perPage}`);
+      console.log(`Fetching data for page: ${page}, perPage: ${this.perPage}, search: ${this.searchQuery}, sort: ${this.sortOrder}`);
       try {
-        const response = await fetch(`${apiUrl}/api/provider?per_page=${this.perPage}&page=${page}`);
+        const response = await fetch(`${apiUrl}/api/provider?per_page=${this.perPage}&page=${page}&search=${this.searchQuery ?? ''}&sort_direction=${this.sortOrder ?? 'desc'}`);
         const data = await response.json();
         console.log('Data fetched:', data);
 
@@ -156,7 +174,10 @@ export default {
       }
     },
     updatePerPage() {
-      this.fetchData(1);
+      this.fetchData(1); // Recarrega a tabela começando da primeira página com o novo valor de perPage
+    },
+    searchProviders() {
+      this.fetchData(1); // Realiza a busca começando da primeira página
     },
     showAddressModal(address) {
       this.selectedAddress = address;
@@ -164,7 +185,8 @@ export default {
     },
     showAddModal() {
       this.isAddModalVisible = true;
-      this.errors = {};
+      this.errors = {}; // Reset errors when opening the add modal
+      this.generalError = ''; // Reset general error when opening the add modal
     },
     closeAddModal() {
       this.isAddModalVisible = false;
@@ -181,12 +203,14 @@ export default {
           body: JSON.stringify(provider)
         });
         if (response.ok) {
-          this.fetchData(this.currentPage);
+          this.fetchData(this.currentPage); // Recarrega os dados após adicionar o fornecedor
           this.closeAddModal();
         } else {
           const errorData = await response.json();
           if (response.status === 422 && errorData.errors) {
             this.errors = errorData.errors;
+          } else if (response.status === 400 && errorData.error) {
+            this.generalError = errorData.error;
           }
           console.error('Erro ao adicionar fornecedor:', errorData);
         }
@@ -195,39 +219,41 @@ export default {
       }
     },
     showEditModal(provider) {
-      this.selectedProvider = { ...provider };
+      this.selectedProvider = { ...provider }; // Clona o fornecedor para edição
       this.isEditModalVisible = true;
-      this.errors = {};
+      this.errors = {}; // Reset errors when opening the edit modal
     },
     closeEditModal() {
       this.isEditModalVisible = false;
     },
     async editProvider(provider) {
-      const apiUrl = import.meta.env.VITE_API_BASE_URL;
-      try {
-        const response = await fetch(`${apiUrl}/api/provider/${provider.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(provider)
-        });
-        if (response.ok) {
-          this.fetchData(this.currentPage);
-          this.closeEditModal();
-        } else {
-          const errorData = await response.json();
-          if (response.status === 422 && errorData.errors) {
-            this.errors = errorData.errors;
-          }
-          console.error('Erro ao editar fornecedor:', errorData);
+    const apiUrl = import.meta.env.VITE_API_BASE_URL;
+    try {
+      const response = await fetch(`${apiUrl}/api/provider/${provider.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(provider)
+      });
+      if (response.ok) {
+        this.fetchData(this.currentPage);
+        this.closeEditModal();
+      } else {
+        const errorData = await response.json();
+        if (response.status === 422 && errorData.errors) {
+          this.errors = errorData.errors;
+        } else if (response.status === 400 && errorData.error) {
+          this.generalError = errorData.error;
         }
-      } catch (error) {
-        console.error('Erro ao editar fornecedor:', error);
+        console.error('Erro ao editar fornecedor:', errorData);
       }
-    },
+    } catch (error) {
+      console.error('Erro ao editar fornecedor:', error);
+    }
+  },
     showDeleteModal(provider) {
-      this.selectedProvider = { ...provider };
+      this.selectedProvider = { ...provider }; // Clona o fornecedor para exclusão
       this.isDeleteModalVisible = true;
     },
     closeDeleteModal() {
@@ -243,7 +269,7 @@ export default {
           }
         });
         if (response.ok) {
-          this.fetchData(this.currentPage);
+          this.fetchData(this.currentPage); // Recarrega os dados após excluir o fornecedor
           this.closeDeleteModal();
         } else {
           console.error('Erro ao excluir fornecedor:', await response.text());
@@ -298,5 +324,8 @@ export default {
 .pagination,
 .form-select {
   margin-top: 10px; /* Adiciona espaço superior para os controles de paginação e seleção */
+}
+.form-select-width-sm {
+  width: 150px; /* Define uma largura específica para o select */
 }
 </style>
